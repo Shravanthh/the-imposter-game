@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Imposter Game</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@10/dist/framer-motion.js"></script>
+    <script src="https://unpkg.com/socket.io-client@4/dist/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'bounce-slow': 'bounce 2s infinite',
+                        'pulse-fast': 'pulse 1s infinite',
+                        'wiggle': 'wiggle 1s ease-in-out infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                        'spin-slow': 'spin 3s linear infinite',
+                        'shake': 'shake 0.5s ease-in-out infinite',
+                        'rainbow': 'rainbow 3s linear infinite',
+                        'zoom': 'zoom 2s ease-in-out infinite',
+                        'slide-in': 'slideIn 0.5s ease-out',
+                        'fade-in': 'fadeIn 0.8s ease-out',
+                        'bounce-in': 'bounceIn 0.6s ease-out',
+                    },
+                    keyframes: {
+                        wiggle: {
+                            '0%, 100%': { transform: 'rotate(-3deg)' },
+                            '50%': { transform: 'rotate(3deg)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        glow: {
+                            '0%': { boxShadow: '0 0 20px #ff6b6b' },
+                            '100%': { boxShadow: '0 0 40px #4ecdc4, 0 0 60px #45b7d1' },
+                        },
+                        shake: {
+                            '0%, 100%': { transform: 'translateX(0)' },
+                            '25%': { transform: 'translateX(-5px)' },
+                            '75%': { transform: 'translateX(5px)' },
+                        },
+                        rainbow: {
+                            '0%': { filter: 'hue-rotate(0deg)' },
+                            '100%': { filter: 'hue-rotate(360deg)' },
+                        },
+                        zoom: {
+                            '0%, 100%': { transform: 'scale(1)' },
+                            '50%': { transform: 'scale(1.1)' },
+                        },
+                        slideIn: {
+                            '0%': { transform: 'translateX(-100%)', opacity: '0' },
+                            '100%': { transform: 'translateX(0)', opacity: '1' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        bounceIn: {
+                            '0%': { transform: 'scale(0.3)', opacity: '0' },
+                            '50%': { transform: 'scale(1.05)' },
+                            '70%': { transform: 'scale(0.9)' },
+                            '100%': { transform: 'scale(1)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .neon-glow {
+            box-shadow: 0 0 20px rgba(79, 172, 254, 0.5), 0 0 40px rgba(79, 172, 254, 0.3), 0 0 60px rgba(79, 172, 254, 0.1);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3);
+            background-size: 400% 400%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient-shift 4s ease infinite;
+        }
+        
+        @keyframes gradient-shift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .flip-card {
+            background-color: transparent;
+            width: 300px;
+            height: 200px;
+            perspective: 1000px;
+            margin: 0 auto;
+        }
+        
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+            cursor: pointer;
+        }
+        
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .flip-card-front {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .flip-card-back {
+            transform: rotateY(180deg);
+            border: 3px solid;
+        }
+        
+        .flip-card-back.imposter {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%, #c44569 100%);
+            border-color: #ff3838;
+            animation: danger-pulse 2s ease-in-out infinite;
+        }
+        
+        .flip-card-back.civilian {
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%, #2ecc71 100%);
+            border-color: #00d2d3;
+            animation: safe-pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes danger-pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 107, 107, 0.5); }
+            50% { box-shadow: 0 0 40px rgba(255, 107, 107, 0.8), 0 0 60px rgba(255, 56, 56, 0.6); }
+        }
+        
+        @keyframes safe-pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(78, 205, 196, 0.5); }
+            50% { box-shadow: 0 0 40px rgba(78, 205, 196, 0.8), 0 0 60px rgba(0, 210, 211, 0.6); }
+        }
+        
+        .floating-emoji {
+            position: absolute;
+            font-size: 2.5rem;
+            opacity: 0.4;
+            animation: float 5s ease-in-out infinite;
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+        }
+        
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            animation: particle-float 8s linear infinite;
+        }
+        
+        .particle:nth-child(odd) {
+            background: linear-gradient(45deg, #4ecdc4, #45b7d1);
+        }
+        
+        .particle:nth-child(even) {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+        }
+        
+        @keyframes particle-float {
+            0% { 
+                transform: translateY(100vh) rotate(0deg) scale(0); 
+                opacity: 1; 
+            }
+            10% { 
+                transform: translateY(90vh) rotate(36deg) scale(1); 
+                opacity: 1; 
+            }
+            90% { 
+                transform: translateY(-10vh) rotate(324deg) scale(1); 
+                opacity: 0.8; 
+            }
+            100% { 
+                transform: translateY(-20vh) rotate(360deg) scale(0); 
+                opacity: 0; 
+            }
+        }
+        
+        .savage-text {
+            background: linear-gradient(45deg, #ff6b6b, #feca57, #ff9ff3);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient-shift 2s ease infinite;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+        }
+        
+        .funky-button {
+            background: linear-gradient(45deg, #667eea, #764ba2, #f093fb, #f5576c);
+            background-size: 300% 300%;
+            animation: gradient-shift 3s ease infinite;
+            border: none;
+            border-radius: 15px;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .funky-button:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .funky-button:active {
+            transform: translateY(0) scale(0.98);
+        }
+        
+        .funky-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+        
+        .funky-button:hover::before {
+            left: 100%;
+        }
+        
+        .player-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .player-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .player-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #feca57);
+            background-size: 200% 100%;
+            animation: gradient-shift 3s linear infinite;
+        }
+        
+        .status-badge {
+            background: linear-gradient(45deg, #4ecdc4, #45b7d1);
+            border-radius: 20px;
+            padding: 8px 16px;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+            animation: pulse 2s infinite;
+        }
+        
+        .danger-badge {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+        
+        .success-badge {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+        }
+        
+        .warning-badge {
+            background: linear-gradient(45deg, #feca57, #ff9ff3);
+            box-shadow: 0 4px 15px rgba(254, 202, 87, 0.3);
+        }
+        
+        .cosmic-bg {
+            background: linear-gradient(45deg, #0f0c29, #302b63, #24243e);
+            background-size: 400% 400%;
+            animation: gradient-shift 8s ease infinite;
+        }
+        
+        .voting-progress {
+            background: linear-gradient(90deg, #4ecdc4, #45b7d1);
+            height: 8px;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            box-shadow: 0 0 20px rgba(78, 205, 196, 0.5);
+        }
+        
+        .emoji-rain {
+            position: fixed;
+            top: -50px;
+            font-size: 2rem;
+            animation: emoji-fall 3s linear infinite;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        @keyframes emoji-fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen cosmic-bg overflow-x-hidden">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { motion } = Motion;
+        const socket = io();
+        
+        // Enhanced floating particles component
+        function FloatingParticles() {
+            return (
+                <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+                    {[...Array(25)].map((_, i) => (
+                        <div
+                            key={i}
+                            className="particle"
+                            style={{
+                                left: `${Math.random() * 100}%`,
+                                animationDelay: `${Math.random() * 8}s`,
+                                animationDuration: `${6 + Math.random() * 6}s`
+                            }}
+                        />
+                    ))}
+                </div>
+            );
+        }
+        
+        // Enhanced floating emojis
+        function FloatingEmojis() {
+            const emojis = ['🕵️', '👥', '🎭', '🔍', '💭', '🗳️', '🏆', '⚡', '🎪', '🎨', '🚀', '💎', '🔥', '⭐', '🌟', '💫'];
+            return (
+                <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+                    {emojis.map((emoji, i) => (
+                        <div
+                            key={i}
+                            className="floating-emoji"
+                            style={{
+                                left: `${5 + (i * 6)}%`,
+                                top: `${10 + Math.random() * 80}%`,
+                                animationDelay: `${i * 0.3}s`,
+                                animationDuration: `${4 + Math.random() * 3}s`
+                            }}
+                        >
+                            {emoji}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+        
+        // Emoji rain effect
+        function EmojiRain({ emoji, duration = 3000 }) {
+            const [emojis, setEmojis] = useState([]);
+            
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    const newEmoji = {
+                        id: Date.now() + Math.random(),
+                        left: Math.random() * 100,
+                        animationDuration: 2 + Math.random() * 2
+                    };
+                    setEmojis(prev => [...prev, newEmoji]);
+                    
+                    setTimeout(() => {
+                        setEmojis(prev => prev.filter(e => e.id !== newEmoji.id));
+                    }, newEmoji.animationDuration * 1000);
+                }, 200);
+                
+                setTimeout(() => clearInterval(interval), duration);
+                return () => clearInterval(interval);
+            }, [duration]);
+            
+            return (
+                <>
+                    {emojis.map(emojiItem => (
+                        <div
+                            key={emojiItem.id}
+                            className="emoji-rain"
+                            style={{
+                                left: `${emojiItem.left}%`,
+                                animationDuration: `${emojiItem.animationDuration}s`
+                            }}
+                        >
+                            {emoji}
+                        </div>
+                    ))}
+                </>
+            );
+        }
+        
+        function FlipCard({ role, secretWord }) {
+            const [isFlipped, setIsFlipped] = useState(false);
+            const [showEmojiRain, setShowEmojiRain] = useState(false);
+            
+            const savageTexts = {
+                imposter: [
+                    "You're the sus one! Time to be sneaky AF! 😈",
+                    "Blend in or get absolutely rekt! 💀",
+                    "You know nothing, Jon Snow! Keep it that way! ❄️",
+                    "Lie like your life depends on it! 🤥",
+                    "Master of deception mode: ACTIVATED! 🎭",
+                    "Time to gaslight everyone! You got this! 🔥",
+                    "Channel your inner villain! 😈👑"
+                ],
+                civilian: [
+                    "You're one of the good guys! Don't mess this up! 😇",
+                    "Time to catch some dirty liars! 🔍",
+                    "Trust absolutely no one! Everyone's sus! 👀",
+                    "Use your brain cells wisely! 🧠✨",
+                    "Detective mode: ON! Find those imposters! 🕵️",
+                    "Your mission: Expose the fakes! 🎯",
+                    "Be the hero this game needs! 🦸‍♂️"
+                ]
+            };
+            
+            const randomText = savageTexts[role][Math.floor(Math.random() * savageTexts[role].length)];
+            
+            const handleClick = () => {
+                if (!isFlipped) {
+                    setIsFlipped(true);
+                    setShowEmojiRain(true);
+                    setTimeout(() => setShowEmojiRain(false), 2000);
+                }
+            };
+            
+            return (
+                <>
+                    {showEmojiRain && <EmojiRain emoji={role === 'imposter' ? '🕵️' : '👥'} duration={2000} />}
+                    <motion.div 
+                        className={`flip-card ${isFlipped ? 'flipped' : ''}`} 
+                        onClick={handleClick}
+                        whileHover={{ scale: 1.05, rotateZ: 2 }}
+                        whileTap={{ scale: 0.95 }}
+                        initial={{ scale: 0, rotateY: -180 }}
+                        animate={{ scale: 1, rotateY: 0 }}
+                        transition={{ duration: 0.8, type: "spring" }}
+                    >
+                        <div className="flip-card-inner">
+                            <div className="flip-card-front neon-glow">
+                                <div className="text-white text-center">
+                                    <motion.div 
+                                        className="text-7xl mb-4"
+                                        animate={{ 
+                                            rotate: [0, 10, -10, 0],
+                                            scale: [1, 1.1, 1]
+                                        }}
+                                        transition={{ duration: 2, repeat: Infinity }}
+                                    >
+                                        🎭
+                                    </motion.div>
+                                    <h3 className="text-2xl font-bold gradient-text mb-2">Click to Reveal</h3>
+                                    <p className="text-sm opacity-70 animate-pulse savage-text">Your Destiny Awaits...</p>
+                                    <div className="mt-4 text-xs opacity-50">
+                                        ✨ Tap the mystery card ✨
+                                    </div>
+                                </div>
+                            </div>
+                            <div className={`flip-card-back ${role === 'imposter' ? 'imposter' : 'civilian'} neon-glow`}>
+                                <div className="text-white text-center p-4">
+                                    {role === 'imposter' ? (
+                                        <>
+                                            <motion.div 
+                                                className="text-6xl mb-3"
+                                                animate={{ 
+                                                    scale: [1, 1.3, 1],
+                                                    rotate: [0, 10, -10, 0]
+                                                }}
+                                                transition={{ duration: 1.5, repeat: Infinity }}
+                                            >
+                                                🕵️
+                                            </motion.div>
+                                            <h3 className="text-xl font-bold mb-3 text-red-200 animate-pulse">IMPOSTER DETECTED!</h3>
+                                            <div className="bg-red-900/60 p-3 rounded-xl mb-3 border-2 border-red-400 animate-shake">
+                                                <p className="text-sm font-bold text-red-200">🚫 NO WORD FOR YOU!</p>
+                                                <p className="text-xs text-red-300 mt-1">You must blend in!</p>
+                                            </div>
+                                            <p className="text-xs savage-text animate-bounce">{randomText}</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <motion.div 
+                                                className="text-6xl mb-3"
+                                                animate={{ 
+                                                    rotate: [0, 360],
+                                                    scale: [1, 1.2, 1]
+                                                }}
+                                                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                            >
+                                                👥
+                                            </motion.div>
+                                            <h3 className="text-xl font-bold mb-3 text-green-200 animate-pulse">CIVILIAN HERO!</h3>
+                                            <div className="bg-white/40 p-3 rounded-xl mb-2 animate-glow border-2 border-green-400">
+                                                <p className="text-xs text-green-900 font-bold">🎯 Secret Word:</p>
+                                                <p className="text-2xl font-bold text-green-900 animate-zoom">{secretWord}</p>
+                                            </div>
+                                            <p className="text-xs savage-text animate-pulse">{randomText}</p>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                </>
+            );
+        }
+        
+        function App() {
+            const [gameCode, setGameCode] = useState('');
+            const [playerName, setPlayerName] = useState('');
+            const [currentGame, setCurrentGame] = useState(null);
+            const [currentPlayer, setCurrentPlayer] = useState(null);
+            const [status, setStatus] = useState('');
+            const [showEmojiRain, setShowEmojiRain] = useState(false);
+            
+            // Savage status messages
+            const savageMessages = {
+                creating: ["Cooking up some chaos... 🔥", "Brewing the perfect storm... ⚡", "Summoning the game gods... 🎭"],
+                joining: ["Infiltrating the party... 🕵️", "Sneaking into the madness... 👥", "Entering the battlefield... ⚔️"],
+                waiting: ["Patience, young grasshopper... 🦗", "Good things come to those who wait... ⏰", "The suspense is killing us... 💀"],
+                reconnecting: ["Teleporting back to reality... 🚀", "Rebuilding the connection... 🔧", "Finding your way back... 🗺️"]
+            };
+            
+            const getRandomSavageMessage = (type) => {
+                const messages = savageMessages[type] || ["Loading awesomeness..."];
+                return messages[Math.floor(Math.random() * messages.length)];
+            };
+            
+            // Trigger emoji rain on game events
+            const triggerEmojiRain = (emoji = '🎉', duration = 2000) => {
+                setShowEmojiRain({ emoji, duration });
+                setTimeout(() => setShowEmojiRain(false), duration);
+            };
+            
+            // Load session on mount
+            useEffect(() => {
+                const savedSession = localStorage.getItem('imposterGameSession');
+                if (savedSession) {
+                    try {
+                        const session = JSON.parse(savedSession);
+                        setPlayerName(session.playerName || '');
+                        setStatus(getRandomSavageMessage('reconnecting'));
+                        
+                        socket.emit('reconnect-player', {
+                            gameId: session.gameId,
+                            playerId: session.playerId,
+                            playerName: session.playerName
+                        });
+                    } catch (error) {
+                        localStorage.removeItem('imposterGameSession');
+                    }
+                }
+            }, []);
+            
+            useEffect(() => {
+                socket.on('game-created', (data) => {
+                    setCurrentGame(data.game);
+                    setCurrentPlayer(data.player);
+                    setStatus('🎉 Game created! You\'re the boss now!');
+                    triggerEmojiRain('👑', 3000);
+                    // Save session
+                    localStorage.setItem('imposterGameSession', JSON.stringify({
+                        gameId: data.gameId,
+                        playerId: data.player.id,
+                        playerName: data.player.name
+                    }));
+                });
+                
+                socket.on('game-joined', (data) => {
+                    setCurrentGame(data.game);
+                    setCurrentPlayer(data.player);
+                    setStatus('🚀 Welcome to the chaos! Let the games begin!');
+                    triggerEmojiRain('🎪', 2500);
+                    // Save session
+                    localStorage.setItem('imposterGameSession', JSON.stringify({
+                        gameId: data.game.id,
+                        playerId: data.player.id,
+                        playerName: data.player.name
+                    }));
+                });
+                
+                socket.on('reconnected', (data) => {
+                    setCurrentGame(data.game);
+                    setCurrentPlayer(data.player);
+                    setStatus('🔥 Back in action! You never left!');
+                    triggerEmojiRain('⚡', 2000);
+                });
+                
+                socket.on('reconnect-failed', () => {
+                    setStatus('💀 Reconnection failed - the party moved on without you!');
+                    localStorage.removeItem('imposterGameSession');
+                });
+                
+                socket.on('game-updated', (game) => {
+                    setCurrentGame(game);
+                    if (currentPlayer && game.players) {
+                        const updatedPlayer = game.players.find(p => p.id === currentPlayer.id);
+                        if (updatedPlayer) {
+                            setCurrentPlayer(updatedPlayer);
+                        } else {
+                            // Player not in game - clear session
+                            setCurrentGame(null);
+                            setCurrentPlayer(null);
+                            localStorage.removeItem('imposterGameSession');
+                        }
+                    }
+                });
+                
+                socket.on('role-assigned', (data) => {
+                    setCurrentPlayer(data.player);
+                    setCurrentGame(data.game);
+                    triggerEmojiRain(data.player.role === 'imposter' ? '🕵️' : '👥', 3000);
+                });
+                
+                socket.on('kicked', () => {
+                    setCurrentGame(null);
+                    setCurrentPlayer(null);
+                    setStatus('');
+                    localStorage.removeItem('imposterGameSession');
+                    alert('💥 BOOM! You\'ve been yeeted out of the game by the admin! 💥');
+                });
+                
+                socket.on('error', (error) => {
+                    setStatus('💀 Oops! Something went wrong: ' + (error.message || 'The universe is broken'));
+                });
+                
+                return () => {
+                    socket.off('game-created');
+                    socket.off('game-joined');
+                    socket.off('reconnected');
+                    socket.off('reconnect-failed');
+                    socket.off('game-updated');
+                    socket.off('role-assigned');
+                    socket.off('kicked');
+                    socket.off('error');
+                };
+            }, []);
+            
+            const createGame = () => {
+                if (!playerName.trim()) {
+                    setStatus('🤔 Hold up! We need your name first, mystery person!');
+                    return;
+                }
+                setStatus(getRandomSavageMessage('creating'));
+                localStorage.removeItem('imposterGameSession'); // Clear old session
+                socket.emit('create-game', { playerName: playerName.trim() });
+            };
+            
+            const joinGame = () => {
+                if (!playerName.trim() || !gameCode.trim()) {
+                    setStatus('🚨 Missing intel! We need both your name AND the secret code!');
+                    return;
+                }
+                setStatus(getRandomSavageMessage('joining'));
+                localStorage.removeItem('imposterGameSession'); // Clear old session
+                socket.emit('join-game', { 
+                    gameId: gameCode.trim().toUpperCase(), 
+                    playerName: playerName.trim() 
+                });
+            };
+            
+            if (currentGame) {
+                // Role Reveal Phase
+                if (currentGame.state === 'REVEAL_ROLE') {
+                    const myRole = currentPlayer?.role;
+                    const playersReady = currentGame.players?.filter(p => p.hasConfirmed).length || 0;
+                    const totalPlayers = currentGame.players?.length || 0;
+                    const allReady = playersReady === totalPlayers;
+                    
+                    return (
+                        <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+                            <FloatingParticles />
+                            <FloatingEmojis />
+                            {showEmojiRain && <EmojiRain emoji={showEmojiRain.emoji} duration={showEmojiRain.duration} />}
+                            
+                            <motion.div 
+                                className="glass p-8 text-center max-w-md mx-auto"
+                                initial={{ scale: 0, rotateY: -180 }}
+                                animate={{ scale: 1, rotateY: 0 }}
+                                transition={{ duration: 0.8, type: "spring" }}
+                            >
+                                <motion.h2 
+                                    className="text-4xl font-bold text-white mb-6 gradient-text"
+                                    animate={{ scale: [1, 1.05, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                >
+                                    🎭 Your Destiny Awaits! 🎭
+                                </motion.h2>
+                                
+                                <FlipCard 
+                                    role={myRole} 
+                                    secretWord={currentGame.currentObject}
+                                />
+                                
+                                <div className="mt-6 space-y-4">
+                                    <div className="status-badge">
+                                        <p className="text-sm font-bold">
+                                            🎯 Ready Players: {playersReady}/{totalPlayers}
+                                        </p>
+                                        <div className="w-full bg-white/20 rounded-full h-2 mt-2">
+                                            <div 
+                                                className="voting-progress"
+                                                style={{ width: `${(playersReady / totalPlayers) * 100}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                    
+                                    {!currentPlayer?.hasConfirmed && (
+                                        <motion.button
+                                            onClick={() => socket.emit('confirm-role', { gameId: currentGame.id })}
+                                            className="w-full funky-button py-4 px-8 text-lg"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                        >
+                                            ✅ I'm Ready to Slay!
+                                        </motion.button>
+                                    )}
+                                    
+                                    {currentPlayer?.hasConfirmed && !allReady && (
+                                        <div className="success-badge">
+                                            <p className="font-bold">🔥 You're locked and loaded!</p>
+                                            <p className="text-sm mt-1">Waiting for the slowpokes...</p>
+                                        </div>
+                                    )}
+                                    
+                                    {currentPlayer?.isAdmin && allReady && (
+                                        <motion.button
+                                            onClick={() => socket.emit('start-discussion', { gameId: currentGame.id })}
+                                            className="w-full funky-button py-4 px-8 text-lg"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                        >
+                                            🚀 Let the Chaos Begin! (Admin)
+                                        </motion.button>
+                                    )}
+                                    
+                                    {currentPlayer?.isAdmin && !allReady && (
+                                        <motion.button
+                                            onClick={() => socket.emit('start-discussion', { gameId: currentGame.id })}
+                                            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 px-6 rounded-xl font-semibold text-sm"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                        >
+                                            ⚡ Force Start (Admin Power!)
+                                        </motion.button>
+                                    )}
+                                </div>
+                            </motion.div>
+                        </div>
+                    );
+                }
+                
+                // Discussion Phase
+                if (currentGame.state === 'DISCUSSION') {
+                    const discussionPlayers = currentGame.discussionOrder || currentGame.players;
+                    const currentTurnPlayer = discussionPlayers?.[currentGame.currentPlayerIndex];
+                    const isMyTurn = currentTurnPlayer?.id === currentPlayer?.id;
+                    const isAdmin = currentPlayer?.isAdmin;
+                    
+                    const discussionTexts = [
+                        "Time to spill the tea! ☕",
+                        "Who's acting sus today? 👀",
+                        "Let the mind games begin! 🧠",
+                        "Expose the liars! 🔍",
+                        "Trust no one! 🕵️"
+                    ];
+                    
+                    return (
+                        <div className="min-h-screen p-4 relative z-10">
+                            <FloatingParticles />
+                            <FloatingEmojis />
+                            {showEmojiRain && <EmojiRain emoji={showEmojiRain.emoji} duration={showEmojiRain.duration} />}
+                            
+                            <div className="max-w-4xl mx-auto space-y-6">
+                                <motion.div 
+                                    className="glass p-6 text-center"
+                                    initial={{ y: -50, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    transition={{ duration: 0.6 }}
+                                >
+                                    <h2 className="text-3xl font-bold text-white mb-2 gradient-text">
+                                        🎪 Discussion Round {currentGame.round} 🎪
+                                    </h2>
+                                    <p className="text-white/80 text-lg savage-text">
+                                        {discussionTexts[Math.floor(Math.random() * discussionTexts.length)]}
+                                    </p>
+                                    <div className="mt-3">
+                                        {isMyTurn ? (
+                                            <div className="status-badge danger-badge animate-pulse">
+                                                🎤 YOUR TURN TO SHINE! 🎤
+                                            </div>
+                                        ) : (
+                                            <div className="status-badge">
+                                                👂 {currentTurnPlayer?.name} is speaking
+                                            </div>
+                                        )}
+                                    </div>
+                                </motion.div>
+                                
+                                <motion.div 
+                                    className="glass p-6"
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ duration: 0.6, delay: 0.2 }}
+                                >
+                                    <h3 className="text-2xl font-semibold text-white mb-4 text-center gradient-text">
+                                        🎯 Speaking Order
+                                    </h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        {discussionPlayers?.map((player, index) => (
+                                            <motion.div 
+                                                key={player.id} 
+                                                className={`player-card p-4 text-center ${
+                                                    index === currentGame.currentPlayerIndex ? 'border-4 border-yellow-400 animate-glow' : 
+                                                    index < currentGame.currentPlayerIndex ? 'bg-green-500/30' : ''
+                                                }`}
+                                                whileHover={{ scale: 1.05 }}
+                                                initial={{ scale: 0, rotateY: -90 }}
+                                                animate={{ scale: 1, rotateY: 0 }}
+                                                transition={{ duration: 0.5, delay: index * 0.1 }}
+                                            >
+                                                <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold mx-auto mb-3 text-xl animate-float">
+                                                    {player.name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div className="text-white font-bold text-lg">{player.name}</div>
+                                                <div className="text-sm mt-2">
+                                                    {index < currentGame.currentPlayerIndex ? (
+                                                        <span className="success-badge text-xs py-1 px-2">✅ Done</span>
+                                                    ) : index === currentGame.currentPlayerIndex ? (
+                                                        <span className="danger-badge text-xs py-1 px-2 animate-pulse">🎤 Speaking</span>
+                                                    ) : (
+                                                        <span className="status-badge text-xs py-1 px-2">#{index + 1} in line</span>
+                                                    )}
+                                                </div>
+                                                {player.isAdmin && (
+                                                    <div className="warning-badge text-xs py-1 px-2 mt-1">👑 Boss</div>
+                                                )}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                                
+                                <div className="text-center space-y-4">
+                                    {isMyTurn && (
+                                        <motion.button
+                                            onClick={() => socket.emit('finish-turn', { gameId: currentGame.id })}
+                                            className="funky-button py-4 px-8 text-lg"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            animate={{ scale: [1, 1.05, 1] }}
+                                            transition={{ duration: 1, repeat: Infinity }}
+                                        >
+                                            🎯 Mic Drop! I'm Done!
+                                        </motion.button>
+                                    )}
+                                    
+                                    {isAdmin && !isMyTurn && (
+                                        <motion.button
+                                            onClick={() => socket.emit('finish-turn', { gameId: currentGame.id })}
+                                            className="bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 px-8 rounded-xl font-semibold"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                        >
+                                            ⏭️ Skip This Slowpoke (Admin)
+                                        </motion.button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+                
+                // Voting Phase
+                if (currentGame.state === 'VOTING') {
+                    const allVoted = currentGame.players?.every(p => p.hasVoted) || false;
+                    const votedCount = currentGame.players?.filter(p => p.hasVoted).length || 0;
+                    const totalCount = currentGame.players?.length || 0;
+                    
+                    const votingTexts = [
+                        "Time to expose the fakes! 🔍",
+                        "Who's been lying to your face? 😤",
+                        "Trust your gut! 🎯",
+                        "Someone's about to get called out! 💀",
+                        "The moment of truth! ⚡"
+                    ];
+                    
+                    // Show voting complete screen
+                    if (currentPlayer?.hasVoted && !allVoted) {
+                        return (
+                            <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+                                <FloatingParticles />
+                                <FloatingEmojis />
+                                
+                                <motion.div 
+                                    className="glass p-8 text-center max-w-md mx-auto"
+                                    initial={{ scale: 0, rotateZ: -10 }}
+                                    animate={{ scale: 1, rotateZ: 0 }}
+                                    transition={{ duration: 0.6, type: "spring" }}
+                                >
+                                    <motion.div 
+                                        className="text-8xl mb-4"
+                                        animate={{ 
+                                            scale: [1, 1.2, 1],
+                                            rotate: [0, 10, -10, 0]
+                                        }}
+                                        transition={{ duration: 2, repeat: Infinity }}
+                                    >
+                                        ✅
+                                    </motion.div>
+                                    <h2 className="text-4xl font-bold text-white mb-4 gradient-text">Vote Locked!</h2>
+                                    <p className="text-white/80 mb-6 savage-text text-lg">
+                                        Your choice is sealed! No take-backs! 🔒
+                                    </p>
+                                    
+                                    <div className="status-badge mb-6">
+                                        <p className="font-bold text-lg">Waiting for the slowpokes...</p>
+                                        <p className="text-xl mt-2 font-bold">
+                                            {votedCount} / {totalCount} votes cast
+                                        </p>
+                                        <div className="w-full bg-white/20 rounded-full h-3 mt-3">
+                                            <div 
+                                                className="voting-progress"
+                                                style={{ width: `${(votedCount / totalCount) * 100}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <motion.div 
+                                        className="flex justify-center space-x-2"
+                                        animate={{ scale: [1, 1.1, 1] }}
+                                        transition={{ duration: 1.5, repeat: Infinity }}
+                                    >
+                                        <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce"></div>
+                                        <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                                        <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                                    </motion.div>
+                                </motion.div>
+                            </div>
+                        );
+                    }
+                    
+                    // Show admin results screen when all voted
+                    if (allVoted && currentPlayer?.isAdmin) {
+                        return (
+                            <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+                                <FloatingParticles />
+                                <FloatingEmojis />
+                                
+                                <motion.div 
+                                    className="glass p-8 text-center max-w-md mx-auto"
+                                    initial={{ scale: 0, rotateY: 180 }}
+                                    animate={{ scale: 1, rotateY: 0 }}
+                                    transition={{ duration: 0.8, type: "spring" }}
+                                >
+                                    <motion.div 
+                                        className="text-8xl mb-4"
+                                        animate={{ rotate: [0, 360] }}
+                                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                    >
+                                        🗳️
+                                    </motion.div>
+                                    <h2 className="text-4xl font-bold text-white mb-4 gradient-text">Democracy Complete!</h2>
+                                    <p className="text-white/80 mb-6 savage-text text-lg">
+                                        Everyone has spoken! Time for the tea to spill! ☕
+                                    </p>
+                                    
+                                    <div className="success-badge mb-6">
+                                        <p className="font-bold text-lg">✅ All Votes Collected!</p>
+                                        <p className="text-xl mt-2 font-bold">
+                                            {totalCount} / {totalCount} players voted
+                                        </p>
+                                    </div>
+                                    
+                                    <motion.button
+                                        onClick={() => socket.emit('next-phase', { gameId: currentGame.id })}
+                                        className="w-full funky-button py-4 px-8 text-lg"
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        animate={{ scale: [1, 1.05, 1] }}
+                                        transition={{ duration: 1, repeat: Infinity }}
+                                    >
+                                        🎭 Reveal the Drama! (Admin)
+                                    </motion.button>
+                                </motion.div>
+                            </div>
+                        );
+                    }
+                    
+                    // Show waiting screen for non-admin when all voted
+                    if (allVoted && !currentPlayer?.isAdmin) {
+                        return (
+                            <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+                                <FloatingParticles />
+                                <FloatingEmojis />
+                                
+                                <motion.div 
+                                    className="glass p-8 text-center max-w-md mx-auto"
+                                    initial={{ opacity: 0, y: 50 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.6 }}
+                                >
+                                    <motion.div 
+                                        className="text-8xl mb-4"
+                                        animate={{ 
+                                            scale: [1, 1.1, 1],
+                                            rotate: [0, 5, -5, 0]
+                                        }}
+                                        transition={{ duration: 2, repeat: Infinity }}
+                                    >
+                                        ⏳
+                                    </motion.div>
+                                    <h2 className="text-4xl font-bold text-white mb-4 gradient-text">The Suspense!</h2>
+                                    <p className="text-white/80 mb-6 savage-text text-lg">
+                                        Admin is cooking up the results... 🍳
+                                    </p>
+                                    
+                                    <div className="status-badge">
+                                        <p className="font-bold">🎪 The show must go on!</p>
+                                        <p className="text-sm mt-2">Results coming in hot...</p>
+                                    </div>
+                                </motion.div>
+                            </div>
+                        );
+                    }
+                    
+                    // Show voting interface
+                    return (
+                        <div className="min-h-screen p-4 relative z-10">
+                            <FloatingParticles />
+                            <FloatingEmojis />
+                            {showEmojiRain && <EmojiRain emoji={showEmojiRain.emoji} duration={showEmojiRain.duration} />}
+                            
+                            <div className="max-w-4xl mx-auto space-y-6">
+                                <motion.div 
+                                    className="glass p-6 text-center"
+                                    initial={{ y: -50, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    transition={{ duration: 0.6 }}
+                                >
+                                    <h2 className="text-4xl font-bold text-white mb-2 gradient-text">🗳️ Judgment Day! 🗳️</h2>
+                                    <p className="text-white/80 text-xl savage-text">
+                                        {votingTexts[Math.floor(Math.random() * votingTexts.length)]}
+                                    </p>
+                                    <div className="mt-4">
+                                        <div className="status-badge">
+                                            🎯 Votes Cast: {votedCount} / {totalCount}
+                                        </div>
+                                        <div className="w-full bg-white/20 rounded-full h-3 mt-3 max-w-xs mx-auto">
+                                            <div 
+                                                className="voting-progress"
+                                                style={{ width: `${(votedCount / totalCount) * 100}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                                
+                                <motion.div 
+                                    className="glass p-6"
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ duration: 0.6, delay: 0.2 }}
+                                >
+                                    <h3 className="text-2xl font-bold text-white mb-6 text-center gradient-text">
+                                        👥 Choose Your Target 👥
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {currentGame.players?.filter(p => p.id !== currentPlayer?.id).map((player, index) => (
+                                            <motion.button
+                                                key={player.id}
+                                                onClick={() => {
+                                                    if (!currentPlayer?.hasVoted) {
+                                                        socket.emit('cast-vote', { gameId: currentGame.id, targetId: player.id });
+                                                        triggerEmojiRain('🎯', 1500);
+                                                    }
+                                                }}
+                                                disabled={currentPlayer?.hasVoted}
+                                                className={`player-card p-6 flex items-center gap-4 text-left transition-all ${
+                                                    currentPlayer?.hasVoted 
+                                                        ? 'opacity-50 cursor-not-allowed' 
+                                                        : 'hover:scale-105 cursor-pointer'
+                                                }`}
+                                                initial={{ scale: 0, rotateX: -90 }}
+                                                animate={{ scale: 1, rotateX: 0 }}
+                                                transition={{ duration: 0.5, delay: index * 0.1 }}
+                                                whileHover={!currentPlayer?.hasVoted ? { scale: 1.05, rotateZ: 2 } : {}}
+                                                whileTap={!currentPlayer?.hasVoted ? { scale: 0.95 } : {}}
+                                            >
+                                                <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xl animate-float">
+                                                    {player.name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-white font-bold text-xl">{player.name}</div>
+                                                    <div className="text-white/70 text-sm mt-1">
+                                                        {currentPlayer?.hasVoted ? '🔒 Vote locked' : '🎯 Click to accuse'}
+                                                    </div>
+                                                </div>
+                                                {!currentPlayer?.hasVoted && (
+                                                    <div className="text-3xl animate-bounce">👆</div>
+                                                )}
+                                            </motion.button>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            </div>
+                        </div>
+                    );
+                }
+                
+                // Results Phase
+                if (currentGame.state === 'RESULTS') {
+                    const sortedPlayers = [...(currentGame.players || [])].sort((a, b) => b.score - a.score);
+                    const imposters = currentGame.players?.filter(p => p.role === 'imposter') || [];
+                    const correctVoters = currentGame.players?.filter(p => 
+                        p.vote && imposters.some(imp => imp.id === p.vote)
+                    ) || [];
+                    const wrongVoters = currentGame.players?.filter(p => 
+                        p.vote && !imposters.some(imp => imp.id === p.vote)
+                    ) || [];
+                    
+                    const resultsTexts = [
+                        "The tea has been spilled! ☕",
+                        "Truth bombs incoming! 💣",
+                        "The receipts are here! 📄",
+                        "Justice has been served! ⚖️",
+                        "The plot thickens! 🎭"
+                    ];
+                    
+                    return (
+                        <div className="min-h-screen p-4 relative z-10">
+                            <FloatingParticles />
+                            <FloatingEmojis />
+                            {showEmojiRain && <EmojiRain emoji={showEmojiRain.emoji} duration={showEmojiRain.duration} />}
+                            
+                            <div className="max-w-4xl mx-auto space-y-6">
+                                <motion.div 
+                                    className="glass p-8 text-center"
+                                    initial={{ scale: 0, rotateZ: -10 }}
+                                    animate={{ scale: 1, rotateZ: 0 }}
+                                    transition={{ duration: 0.8, type: "spring" }}
+                                >
+                                    <h2 className="text-4xl font-bold text-white mb-4 gradient-text">
+                                        🎭 Round {currentGame.round} Results! 🎭
+                                    </h2>
+                                    <p className="text-xl savage-text mb-6">
+                                        {resultsTexts[Math.floor(Math.random() * resultsTexts.length)]}
+                                    </p>
+                                    
+                                    <div className="space-y-4">
+                                        <motion.div 
+                                            className="status-badge text-lg"
+                                            animate={{ scale: [1, 1.05, 1] }}
+                                            transition={{ duration: 2, repeat: Infinity }}
+                                        >
+                                            <p className="mb-2">🎯 The secret object was:</p>
+                                            <p className="text-3xl font-bold gradient-text">{currentGame.currentObject}</p>
+                                        </motion.div>
+                                        
+                                        <motion.div 
+                                            className="danger-badge text-lg"
+                                            animate={{ scale: [1, 1.05, 1] }}
+                                            transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                                        >
+                                            <p className="mb-2">🕵️ The imposters were:</p>
+                                            <div className="flex justify-center gap-3 flex-wrap">
+                                                {imposters.map((imp) => (
+                                                    <span key={imp.id} className="text-2xl font-bold animate-wiggle">
+                                                        🕵️ {imp.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    </div>
+                                </motion.div>
+                                
+                                {/* Enhanced Round Details */}
+                                <motion.div 
+                                    className="glass p-6"
+                                    initial={{ y: 50, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    transition={{ duration: 0.6, delay: 0.3 }}
+                                >
+                                    <h3 className="text-2xl font-bold text-white mb-6 text-center gradient-text">
+                                        🎯 The Drama Breakdown 🎯
+                                    </h3>
+                                    
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        {/* Correct Guesses */}
+                                        <motion.div 
+                                            className="success-badge p-6 rounded-xl"
+                                            whileHover={{ scale: 1.02 }}
+                                        >
+                                            <h4 className="text-xl font-bold mb-4">
+                                                ✅ Smart Cookies ({correctVoters.length})
+                                            </h4>
+                                            {correctVoters.length > 0 ? (
+                                                <div className="space-y-3">
+                                                    {correctVoters.map(player => {
+                                                        const votedFor = currentGame.players?.find(p => p.id === player.vote);
+                                                        return (
+                                                            <motion.div 
+                                                                key={player.id} 
+                                                                className="flex justify-between items-center bg-white/20 p-3 rounded-xl"
+                                                                whileHover={{ scale: 1.02 }}
+                                                            >
+                                                                <span className="text-white font-bold">{player.name}</span>
+                                                                <span className="text-green-200 font-bold">
+                                                                    exposed {votedFor?.name} (+50 pts) 🎯
+                                                                </span>
+                                                            </motion.div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <p className="text-white/80 text-center italic">
+                                                    Nobody saw through the lies! 😱
+                                                </p>
+                                            )}
+                                        </motion.div>
+                                        
+                                        {/* Wrong Guesses */}
+                                        <motion.div 
+                                            className="danger-badge p-6 rounded-xl"
+                                            whileHover={{ scale: 1.02 }}
+                                        >
+                                            <h4 className="text-xl font-bold mb-4">
+                                                ❌ Got Played ({wrongVoters.length})
+                                            </h4>
+                                            {wrongVoters.length > 0 ? (
+                                                <div className="space-y-3">
+                                                    {wrongVoters.map(player => {
+                                                        const votedFor = currentGame.players?.find(p => p.id === player.vote);
+                                                        return (
+                                                            <motion.div 
+                                                                key={player.id} 
+                                                                className="flex justify-between items-center bg-white/20 p-3 rounded-xl"
+                                                                whileHover={{ scale: 1.02 }}
+                                                            >
+                                                                <span className="text-white font-bold">{player.name}</span>
+                                                                <span className="text-red-200 font-bold">
+                                                                    blamed {votedFor?.name} (-30 pts) 💀
+                                                                </span>
+                                                            </motion.div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <p className="text-white/80 text-center italic">
+                                                    Everyone nailed it! 🎉
+                                                </p>
+                                            )}
+                                        </motion.div>
+                                    </div>
+                                    
+                                    {/* Enhanced Imposter Performance */}
+                                    <motion.div 
+                                        className="mt-6 warning-badge p-6 rounded-xl"
+                                        whileHover={{ scale: 1.02 }}
+                                    >
+                                        <h4 className="text-xl font-bold mb-4">🕵️ Imposter Report Card</h4>
+                                        <div className="space-y-3">
+                                            {imposters.map(imp => {
+                                                const votesAgainst = currentGame.players?.filter(p => p.vote === imp.id).length || 0;
+                                                const caught = votesAgainst > 0;
+                                                return (
+                                                    <motion.div 
+                                                        key={imp.id} 
+                                                        className="flex justify-between items-center bg-white/20 p-3 rounded-xl"
+                                                        whileHover={{ scale: 1.02 }}
+                                                    >
+                                                        <span className="text-white font-bold">{imp.name}</span>
+                                                        <span className={`font-bold ${caught ? 'text-red-200' : 'text-green-200'}`}>
+                                                            {caught ? 
+                                                                `BUSTED! ${votesAgainst} votes (-50 pts) 🚨` : 
+                                                                'ESCAPED! Master of deception (+100 pts) 😈'
+                                                            }
+                                                        </span>
+                                                    </motion.div>
+                                                );
+                                            })}
+                                        </div>
+                                    </motion.div>
+                                </motion.div>
+                                
+                                {/* Enhanced Scorecard with Kick Feature */}
+                                <motion.div 
+                                    className="glass p-6"
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ duration: 0.6, delay: 0.6 }}
+                                >
+                                    <h3 className="text-3xl font-bold text-white mb-6 text-center gradient-text">
+                                        🏆 Hall of Fame & Shame 🏆
+                                    </h3>
+                                    <div className="space-y-4">
+                                        {sortedPlayers.map((player, index) => (
+                                            <motion.div 
+                                                key={player.id} 
+                                                className="player-card p-6 flex items-center justify-between"
+                                                initial={{ x: -100, opacity: 0 }}
+                                                animate={{ x: 0, opacity: 1 }}
+                                                transition={{ duration: 0.5, delay: index * 0.1 }}
+                                                whileHover={{ scale: 1.02 }}
+                                            >
+                                                <div className="flex items-center gap-6">
+                                                    <div className="text-4xl font-bold text-white">
+                                                        {index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                                                    </div>
+                                                    <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xl animate-float">
+                                                        {player.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-white font-bold text-xl">{player.name}</div>
+                                                        <div className="text-white/70 text-sm flex items-center gap-2">
+                                                            <span>{player.role === 'imposter' ? '🕵️ Master Deceiver' : '👥 Truth Seeker'}</span>
+                                                            {player.isAdmin && <span className="warning-badge text-xs py-1 px-2">👑 Boss</span>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <motion.div 
+                                                        className="text-4xl font-bold gradient-text"
+                                                        animate={{ scale: [1, 1.1, 1] }}
+                                                        transition={{ duration: 2, repeat: Infinity, delay: index * 0.2 }}
+                                                    >
+                                                        {player.score}
+                                                    </motion.div>
+                                                    {currentPlayer?.isAdmin && player.id !== currentPlayer.id && (
+                                                        <motion.button
+                                                            onClick={() => {
+                                                                if (confirm(`💥 Are you sure you want to YEET ${player.name} out of the game? This action cannot be undone! 💥`)) {
+                                                                    socket.emit('kick-player', { gameId: currentGame.id, playerId: player.id });
+                                                                }
+                                                            }}
+                                                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-bold text-sm"
+                                                            whileHover={{ scale: 1.1 }}
+                                                            whileTap={{ scale: 0.9 }}
+                                                        >
+                                                            💥 YEET
+                                                        </motion.button>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                                
+                                <div className="text-center">
+                                    {currentPlayer?.isAdmin ? (
+                                        <motion.button
+                                            onClick={() => {
+                                                socket.emit('next-phase', { gameId: currentGame.id });
+                                                triggerEmojiRain('🚀', 3000);
+                                            }}
+                                            className="funky-button py-4 px-8 text-xl"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            animate={{ scale: [1, 1.05, 1] }}
+                                            transition={{ duration: 1.5, repeat: Infinity }}
+                                        >
+                                            🚀 Launch Next Round! (Admin)
+                                        </motion.button>
+                                    ) : (
+                                        <div className="status-badge text-lg">
+                                            <p>⏳ Waiting for the boss to start the next round...</p>
+                                            <p className="text-sm mt-2">Admin will decide when to continue</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+                
+                // Lobby (default)
+                return (
+                    <div className="min-h-screen p-4 relative z-10">
+                        <FloatingParticles />
+                        <FloatingEmojis />
+                        {showEmojiRain && <EmojiRain emoji={showEmojiRain.emoji} duration={showEmojiRain.duration} />}
+                        
+                        <div className="max-w-4xl mx-auto">
+                            <motion.div 
+                                className="glass p-8 mb-6"
+                                initial={{ y: -50, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                transition={{ duration: 0.6 }}
+                            >
+                                <h1 className="text-4xl font-bold text-white mb-4 text-center gradient-text">
+                                    🎪 Game Lobby 🎪
+                                </h1>
+                                <div className="flex items-center justify-center gap-6 flex-wrap">
+                                    <div className="text-center">
+                                        <span className="text-white/70 text-lg">Game Code:</span>
+                                        <div className="status-badge text-2xl font-mono mt-2">
+                                            {currentGame.id}
+                                        </div>
+                                    </div>
+                                    <div className="text-center">
+                                        <span className="text-white/70 text-lg">Players:</span>
+                                        <div className="warning-badge text-2xl font-bold mt-2">
+                                            {currentGame.players?.length || 0}
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                            
+                            <motion.div 
+                                className="glass p-8"
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ duration: 0.6, delay: 0.2 }}
+                            >
+                                <h2 className="text-3xl font-semibold text-white mb-6 text-center gradient-text">
+                                    👥 The Squad ({currentGame.players?.length || 0})
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {currentGame.players?.map((player, index) => (
+                                        <motion.div 
+                                            key={player.id} 
+                                            className="player-card p-6 flex items-center gap-4"
+                                            initial={{ scale: 0, rotateY: -90 }}
+                                            animate={{ scale: 1, rotateY: 0 }}
+                                            transition={{ duration: 0.5, delay: index * 0.1 }}
+                                            whileHover={{ scale: 1.05, rotateZ: 2 }}
+                                        >
+                                            <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xl animate-float">
+                                                {player.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="text-white font-bold text-lg">{player.name}</div>
+                                                <div className="text-white/70 text-sm">Score: {player.score}</div>
+                                                {player.isAdmin && (
+                                                    <div className="warning-badge text-xs py-1 px-2 mt-1 inline-block">
+                                                        👑 Boss
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                                
+                                <div className="mt-8 text-center space-y-4">
+                                    {currentGame.players?.length >= 3 && currentPlayer?.isAdmin && (
+                                        <motion.button 
+                                            onClick={() => {
+                                                socket.emit('start-game', { gameId: currentGame.id });
+                                                triggerEmojiRain('🚀', 3000);
+                                            }}
+                                            className="funky-button py-4 px-8 text-xl"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            animate={{ scale: [1, 1.05, 1] }}
+                                            transition={{ duration: 1.5, repeat: Infinity }}
+                                        >
+                                            🚀 Launch the Chaos! (Admin)
+                                        </motion.button>
+                                    )}
+                                    
+                                    {currentGame.players?.length < 3 && (
+                                        <div className="warning-badge text-lg">
+                                            <p className="font-bold">⚠️ Need More Players!</p>
+                                            <p className="text-sm mt-2">
+                                                Minimum 3 players required to start the mayhem
+                                            </p>
+                                        </div>
+                                    )}
+                                    
+                                    {!currentPlayer?.isAdmin && currentGame.players?.length >= 3 && (
+                                        <div className="status-badge text-lg">
+                                            <p>⏳ Waiting for the boss to start...</p>
+                                            <p className="text-sm mt-2">Only the admin can launch the game</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            // Main Menu
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+                    <FloatingParticles />
+                    <FloatingEmojis />
+                    {showEmojiRain && <EmojiRain emoji={showEmojiRain.emoji} duration={showEmojiRain.duration} />}
+                    
+                    <motion.div 
+                        className="glass p-10 max-w-md w-full"
+                        initial={{ scale: 0, rotateY: -180 }}
+                        animate={{ scale: 1, rotateY: 0 }}
+                        transition={{ duration: 0.8, type: "spring" }}
+                    >
+                        <div className="text-center mb-10">
+                            <motion.h1 
+                                className="text-5xl font-bold text-white mb-4 gradient-text"
+                                animate={{ scale: [1, 1.05, 1] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                            >
+                                🕵️ The Imposter 🕵️
+                            </motion.h1>
+                            <motion.p 
+                                className="text-white/80 text-lg savage-text"
+                                animate={{ opacity: [0.8, 1, 0.8] }}
+                                transition={{ duration: 3, repeat: Infinity }}
+                            >
+                                Find the liars through epic mind games! 🧠💥
+                            </motion.p>
+                        </div>
+                        
+                        {status && (
+                            <motion.div 
+                                className="mb-6 status-badge text-center"
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ duration: 0.5 }}
+                            >
+                                <p className="font-bold">{status}</p>
+                            </motion.div>
+                        )}
+                        
+                        <div className="space-y-6">
+                            <motion.input
+                                type="text"
+                                placeholder="Enter your epic name"
+                                value={playerName}
+                                onChange={(e) => setPlayerName(e.target.value)}
+                                className="w-full px-6 py-4 bg-white/10 border-2 border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold"
+                                whileFocus={{ scale: 1.02 }}
+                            />
+                            
+                            <motion.button
+                                onClick={createGame}
+                                className="w-full funky-button py-4 px-6 text-lg"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                            >
+                                🎪 Create Epic Game
+                            </motion.button>
+                            
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t-2 border-white/20"></div>
+                                </div>
+                                <div className="relative flex justify-center text-lg">
+                                    <span className="px-4 bg-transparent text-white/70 font-bold">OR</span>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-4">
+                                <motion.input
+                                    type="text"
+                                    placeholder="Enter secret game code"
+                                    value={gameCode}
+                                    onChange={(e) => setGameCode(e.target.value.toUpperCase())}
+                                    className="w-full px-6 py-4 bg-white/10 border-2 border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg font-mono font-bold text-center"
+                                    whileFocus={{ scale: 1.02 }}
+                                />
+                                
+                                <motion.button
+                                    onClick={joinGame}
+                                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 px-6 rounded-xl font-bold text-lg"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    🚀 Join the Madness
+                                </motion.button>
+                            </div>
+                        </div>
+                        
+                        <motion.div 
+                            className="mt-8 text-center text-white/50 text-sm"
+                            animate={{ opacity: [0.5, 0.8, 0.5] }}
+                            transition={{ duration: 4, repeat: Infinity }}
+                        >
+                            ✨ Ready to expose some liars? ✨
+                        </motion.div>
+                    </motion.div>
+                </div>
+            );
+        }
+        
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
