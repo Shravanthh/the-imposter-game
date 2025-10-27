@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -8,7 +8,7 @@ import ErrorScreen from '@/components/ErrorScreen';
 import GameLayout from '@/components/GameLayout';
 import GameCard from '@/components/GameCard';
 
-export default function Lobby() {
+function LobbyContent() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [startingGame, setStartingGame] = useState(false);
@@ -179,5 +179,13 @@ export default function Lobby() {
         </GameCard>
       </div>
     </GameLayout>
+  );
+}
+
+export default function Lobby() {
+  return (
+    <Suspense fallback={<LoadingScreen message="Preparing the chaos chamber... 🎭" />}>
+      <LobbyContent />
+    </Suspense>
   );
 }

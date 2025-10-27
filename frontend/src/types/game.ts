@@ -1,8 +1,12 @@
+import { ScoreBreakdown, Achievement } from './scoring';
+
 export interface Player {
   id: string;
   name: string;
   role: 'civilian' | 'imposter';
   score: number;
+  roundScore?: ScoreBreakdown;
+  achievements?: Achievement[];
   hasVoted: boolean;
   vote?: string;
   isAdmin?: boolean;

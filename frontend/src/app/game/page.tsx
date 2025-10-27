@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
 import { GameState } from '@/types/game';
@@ -8,8 +8,9 @@ import LoadingScreen from '@/components/LoadingScreen';
 import ErrorScreen from '@/components/ErrorScreen';
 import GameLayout from '@/components/GameLayout';
 import GameCard from '@/components/GameCard';
+import ResultsDisplay from '@/components/ResultsDisplay';
 
-export default function GamePage() {
+function GamePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const gameId = searchParams.get('gameId');
@@ -182,7 +183,7 @@ export default function GamePage() {
         );
 
       case GameState.DISCUSSION:
-        const currentTurnPlayer = game.discussionOrder?.[game.currentPlayerIndex!];
+        const currentTurnPlayer = game.discussionOrder?.[game.currentPlayerIndex ?? 0];
         const isMyTurn = currentTurnPlayer?.id === currentPlayer.id;
         
         return (
@@ -213,7 +214,7 @@ export default function GamePage() {
                         className={`p-4 rounded-lg text-center transition-all ${
                           index === game.currentPlayerIndex 
                             ? 'bg-primary/20 border-2 border-primary' 
-                            : index < game.currentPlayerIndex!
+                            : index < (game.currentPlayerIndex ?? 0)
                             ? 'bg-success/20 border border-success/30'
                             : 'bg-black/20 border border-border-color'
                         }`}
@@ -225,7 +226,7 @@ export default function GamePage() {
                         </div>
                         <div className="font-medium text-text-light text-sm mb-1">{player.name}</div>
                         <div className="text-xs">
-                          {index < game.currentPlayerIndex ? (
+                          {index < (game.currentPlayerIndex ?? 0) ? (
                             <span className="text-success">✅ Survived</span>
                           ) : index === game.currentPlayerIndex ? (
                             <span className="text-primary">🎤 Lying Now</span>
@@ -354,169 +355,13 @@ export default function GamePage() {
         );
 
       case GameState.RESULTS:
-        const imposters = game.players.filter(p => p.role === 'imposter');
-        const sortedPlayers = [...game.players].sort((a, b) => b.score - a.score);
-        const crewWins = imposters.length === 0 || imposters.every(imp => game.players.some(p => p.votedFor === imp.id));
-        
         return (
-          <div className="relative min-h-screen bg-background flex flex-col">
-            {/* Confetti */}
-            {Array.from({ length: 11 }).map((_, i) => (
-              <div key={i} className="confetti"></div>
-            ))}
-            
-            <div className="flex-1 flex flex-col p-4 sm:p-6">
-              <main className="flex-1 flex flex-col items-center justify-center py-4">
-                <div className="w-full max-w-7xl text-center mb-8">
-                  <p className="text-4xl md:text-6xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-accent-gold to-green-300 mb-2">
-                    {crewWins ? 'Truth Seekers Win! 🎉' : 'Liars Triumph! 😈'}
-                  </p>
-                  <p className="text-text-secondary text-lg">
-                    The secret was: <span className="font-bold text-text-primary text-xl">{game.currentObject}</span>
-                    {crewWins ? ' (Well done, detectives!)' : ' (Better luck next time!)'}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-7xl flex-1">
-                  {/* Leaderboard */}
-                  <div className="lg:col-span-1 flex justify-center">
-                    <GameCard className="h-full w-full">
-                      <div className="space-y-4">
-                        <h3 className="text-xl font-bold text-text-primary">Hall of Fame (or Shame) 🏆</h3>
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {sortedPlayers.map((player, index) => (
-                            <div key={player.id} className={`flex items-center gap-3 p-3 rounded-lg ${
-                              index === 0 ? 'bg-accent-gold/10 border border-accent-gold' : 'bg-black/20'
-                            }`}>
-                              <span className={`font-bold w-6 text-center ${
-                                index === 0 ? 'text-accent-gold' : 'text-text-secondary'
-                              }`}>
-                                #{index + 1}
-                              </span>
-                              <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center">
-                                <span className="font-bold text-white text-sm">
-                                  {player.name.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-text-primary font-semibold text-sm truncate">{player.name}</p>
-                                <p className="text-text-secondary text-xs">{player.score} Chaos Points</p>
-                              </div>
-                              <span className={`font-bold text-sm ${
-                                player.role === 'imposter' && !crewWins ? 'text-success' : 
-                                player.role !== 'imposter' && crewWins ? 'text-success' : 'text-failure'
-                              }`}>
-                                {player.role === 'imposter' && !crewWins ? '+100' : 
-                                 player.role !== 'imposter' && crewWins ? '+100' : '-50'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {/* Imposter Reveal */}
-                        <div className="bg-primary/20 border border-primary/50 rounded-lg p-4 text-center">
-                          <p className="text-primary text-xs font-bold tracking-widest mb-2">
-                            THE SNEAKY LIAR{imposters.length > 1 ? 'S' : ''} {imposters.length > 1 ? 'WERE' : 'WAS'}
-                          </p>
-                          {imposters.map(imposter => (
-                            <div key={imposter.id} className="space-y-2">
-                              <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto border-2 border-primary">
-                                <span className="font-bold text-white text-lg">
-                                  {imposter.name.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                              <p className="text-text-primary font-bold">{imposter.name}</p>
-                              <p className="text-text-secondary text-xs">Master of Deception 🎭</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </GameCard>
-                  </div>
-
-                  {/* Voting Results */}
-                  <div className="lg:col-span-2 flex justify-center">
-                    <GameCard className="h-full w-full">
-                      <div className="space-y-4">
-                        <h2 className="text-xl font-bold text-text-primary">Who Blamed Who? 🫵</h2>
-                        <div className="overflow-y-auto max-h-80">
-                          <div className="space-y-2">
-                            {game.players.map((player) => {
-                              const targetPlayer = game.players.find(p => p.id === player.votedFor);
-                              const votedCorrectly = targetPlayer?.role === 'imposter';
-                              const isImposter = player.role === 'imposter';
-                              
-                              return (
-                                <div key={player.id} className={`flex items-center justify-between p-3 rounded-lg ${
-                                  isImposter ? 'bg-primary/10 border border-primary/30' : 'bg-black/20'
-                                }`}>
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center">
-                                      <span className="font-bold text-white text-sm">
-                                        {player.name.charAt(0).toUpperCase()}
-                                      </span>
-                                    </div>
-                                    <span className={`font-medium ${isImposter ? 'text-primary' : 'text-text-light'}`}>
-                                      {player.name} {isImposter ? '(The Liar)' : ''}
-                                    </span>
-                                  </div>
-                                  
-                                  <div className="flex items-center gap-3">
-                                    {targetPlayer ? (
-                                      <div className={`flex items-center gap-2 ${
-                                        votedCorrectly ? 'text-success' : 'text-failure'
-                                      }`}>
-                                        <span className="material-symbols-outlined text-sm">
-                                          {votedCorrectly ? 'check_circle' : 'cancel'}
-                                        </span>
-                                        <span className="text-sm">blamed {targetPlayer.name}</span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-text-secondary text-sm">Chickened out</span>
-                                    )}
-                                    
-                                    <span className={`font-bold text-sm ${
-                                      isImposter && !crewWins ? 'text-success' :
-                                      !isImposter && crewWins ? 'text-success' :
-                                      votedCorrectly ? 'text-success' : 'text-failure'
-                                    }`}>
-                                      {isImposter && !crewWins ? '+100' :
-                                       !isImposter && crewWins ? '+100' :
-                                       votedCorrectly ? '+100' : '-50'}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </GameCard>
-                  </div>
-                </div>
-              </main>
-
-              {/* Footer */}
-              <footer className="flex-shrink-0 flex justify-center">
-                <div className="bg-surface/80 backdrop-blur-sm border border-border-color rounded-xl p-3 flex items-center gap-4 max-w-md">
-                  <button 
-                    onClick={() => router.push('/')}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-black/20 text-text-primary text-sm font-medium rounded-lg border border-border-color hover:bg-white/10 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-lg">logout</span>
-                    <span>Escape Chaos</span>
-                  </button>
-                  <button 
-                    onClick={() => emit('next-phase')}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-accent-teal text-white text-sm font-bold rounded-lg hover:bg-accent-teal/80 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-lg">skip_next</span>
-                    <span>More Chaos!</span>
-                  </button>
-                </div>
-              </footer>
-            </div>
-          </div>
+          <ResultsDisplay
+            game={game}
+            currentPlayer={currentPlayer}
+            onNextRound={() => emit('next-phase')}
+            onGoHome={() => router.push('/')}
+          />
         );
 
       default:
@@ -534,4 +379,12 @@ export default function GamePage() {
   };
 
   return renderGameState();
+}
+
+export default function GamePage() {
+  return (
+    <Suspense fallback={<LoadingScreen message="Loading your destiny... 🎭" />}>
+      <GamePageContent />
+    </Suspense>
+  );
 }
